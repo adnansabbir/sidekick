@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" class="h-full">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="color-scheme" content="light dark" />
+        <title>Sidekick</title>
+        <link rel="stylesheet" href="./sidepanel.css" />
+    </head>
+    <body
+        class="relative h-full m-0 font-sans text-neutral-900 dark:text-neutral-100 bg-white dark:bg-[radial-gradient(circle_at_82%_20%,#1446843d,transparent_30%),linear-gradient(145deg,#040711_0%,#071022_55%,#060914_100%)]"
+    >
+        <div class="flex flex-col h-screen">
+            <div id="messages" class="flex-1 overflow-y-auto p-4"></div>
+            <div
+                class="flex items-center gap-2 p-3 border-t border-black/10 dark:border-white/10"
+            >
+                <div class="relative">
+                    <button
+                        type="button"
+                        id="mic-button"
+                        title="Start listening"
+                        aria-label="Start listening"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        class="flex items-center justify-center shrink-0 w-9 h-9 rounded-full border-0 cursor-pointer bg-black/5 dark:bg-white/10 text-inherit"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            aria-hidden="true"
+                            class="w-5 h-5"
+                        >
+                            <path
+                                d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"
+                            />
+                        </svg>
+                    </button>
+                    <div
+                        id="mic-mode-popup"
+                        role="menu"
+                        class="hidden absolute bottom-full left-0 mb-2 w-48 py-1 z-10"
+                    >
+                        <button
+                            type="button"
+                            id="mic-mode-send"
+                            role="menuitem"
+                            class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm cursor-pointer bg-transparent border-0"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                aria-hidden="true"
+                                class="w-4 h-4 shrink-0"
+                            >
+                                <path
+                                    d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"
+                                />
+                            </svg>
+                            Send as I speak
+                        </button>
+                        <button
+                            type="button"
+                            id="mic-mode-dictate"
+                            role="menuitem"
+                            class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm cursor-pointer bg-transparent border-0"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                aria-hidden="true"
+                                class="w-4 h-4 shrink-0"
+                            >
+                                <path
+                                    d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"
+                                />
+                            </svg>
+                            Dictate only
+                        </button>
+                    </div>
+                </div>
+                <input
+                    type="text"
+                    id="text-input"
+                    placeholder="Type or speak..."
+                    aria-label="Command input"
+                    class="flex-1 px-2.5 py-2 rounded-md border border-black/15 dark:border-white/15 bg-black/5 dark:bg-white/5 text-inherit font-inherit"
+                />
+                <button
+                    type="button"
+                    id="send-button"
+                    title="Send"
+                    aria-label="Send"
+                    class="flex items-center justify-center shrink-0 w-9 h-9 rounded-full border-0 cursor-pointer bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden="true"
+                        class="w-5 h-5"
+                    >
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <script type="module" src="./sidepanel.ts"></script>
+    </body>
+</html>
