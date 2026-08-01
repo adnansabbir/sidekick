@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": ["ES2022", "DOM"],
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "types": ["chrome"],
+        "strict": true,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "allowImportingTsExtensions": true
+    },
+    "include": ["src", "manifest.config.ts", "vite.config.ts"]
+}

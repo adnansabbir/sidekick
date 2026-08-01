@@ -1,0 +1,29 @@
+{
+    "name": "sidekick",
+    "version": "1.0.0",
+    "description": "Privacy-first Chrome extension — an AI sidekick that summarizes, chats about, and takes action on any website, running entirely on-device with no backend or data storage.",
+    "main": "index.js",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "format": "prettier --write .",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git@github-adnan:adnansabbir/sidekick.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "module",
+    "devDependencies": {
+        "@crxjs/vite-plugin": "^2.7.1",
+        "@tailwindcss/vite": "^4.3.3",
+        "@types/chrome": "^0.2.6",
+        "prettier": "^3.9.6",
+        "tailwindcss": "^4.3.3",
+        "typescript": "^7.0.2",
+        "vite": "^8.2.2"
+    }
+}

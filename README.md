@@ -1,2 +1,3 @@
-# odoo-voice-assistant
-Privacy-first Chrome extension for controlling Odoo with voice and natural-language commands using direct Odoo RPC, local processing, and no backend or data storage.
+# Sidekick
+
+Privacy-first Chrome extension — an AI sidekick that summarizes, chats about, and takes action on any website, running entirely on-device with no backend or data storage.
