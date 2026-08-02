@@ -1,20 +1,82 @@
 const micButton = document.querySelector<HTMLButtonElement>("#mic-button")!;
-const micModePopup =
-    document.querySelector<HTMLDivElement>("#mic-mode-popup")!;
-const micModeSendButton = document.querySelector<HTMLButtonElement>(
-    "#mic-mode-send",
-)!;
-const micModeDictateButton = document.querySelector<HTMLButtonElement>(
-    "#mic-mode-dictate",
-)!;
+const micModePopup = document.querySelector<HTMLDivElement>("#mic-mode-popup")!;
+const micModeSendButton =
+    document.querySelector<HTMLButtonElement>("#mic-mode-send")!;
+const micModeDictateButton =
+    document.querySelector<HTMLButtonElement>("#mic-mode-dictate")!;
 const textInput = document.querySelector<HTMLInputElement>("#text-input")!;
 const sendButton = document.querySelector<HTMLButtonElement>("#send-button")!;
 const messages = document.querySelector<HTMLDivElement>("#messages")!;
+const menuButton = document.querySelector<HTMLButtonElement>("#menu-button")!;
+const menuDropdown = document.querySelector<HTMLDivElement>("#menu-dropdown")!;
+const settingsMenuItem = document.querySelector<HTMLButtonElement>(
+    "#settings-menu-item",
+)!;
+const settingsPage = document.querySelector<HTMLDivElement>("#settings-page")!;
+const settingsBackButton = document.querySelector<HTMLButtonElement>(
+    "#settings-back-button",
+)!;
+const settingsSaveButton = document.querySelector<HTMLButtonElement>(
+    "#settings-save-button",
+)!;
+const settingsCancelButton = document.querySelector<HTMLButtonElement>(
+    "#settings-cancel-button",
+)!;
+
+function closeMenu(): void {
+    menuDropdown.classList.add("hidden");
+    menuButton.setAttribute("aria-expanded", "false");
+}
+
+menuButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const isOpen = !menuDropdown.classList.contains("hidden");
+    if (isOpen) {
+        closeMenu();
+    } else {
+        menuDropdown.classList.remove("hidden");
+        menuButton.setAttribute("aria-expanded", "true");
+    }
+});
+
+document.addEventListener("click", (event) => {
+    const target = event.target as Node;
+    if (!menuButton.contains(target) && !menuDropdown.contains(target)) {
+        closeMenu();
+    }
+});
+
+settingsMenuItem.addEventListener("click", () => {
+    closeMenu();
+    settingsPage.classList.remove("hidden");
+});
 
 const LANGUAGE_STORAGE_KEY = "voiceAssistant.language";
 const DEFAULT_LANGUAGE = "en-US";
-const appliedLanguage =
+
+const languageSelect =
+    document.querySelector<HTMLSelectElement>("#language-select")!;
+
+let appliedLanguage =
     localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? DEFAULT_LANGUAGE;
+languageSelect.value = appliedLanguage;
+
+let onLanguageApplied: ((lang: string) => void) | null = null;
+
+function closeSettingsDiscardingChanges(): void {
+    languageSelect.value = appliedLanguage;
+    settingsPage.classList.add("hidden");
+}
+
+settingsBackButton.addEventListener("click", closeSettingsDiscardingChanges);
+settingsCancelButton.addEventListener("click", closeSettingsDiscardingChanges);
+
+settingsSaveButton.addEventListener("click", () => {
+    appliedLanguage = languageSelect.value;
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, appliedLanguage);
+    onLanguageApplied?.(appliedLanguage);
+    settingsPage.classList.add("hidden");
+});
 
 function addMessage(text: string): void {
     const bubble = document.createElement("div");
@@ -63,6 +125,10 @@ if (!SpeechRecognitionCtor) {
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = appliedLanguage;
+
+    onLanguageApplied = (lang) => {
+        recognition.lang = lang;
+    };
 
     let listening = false;
 
