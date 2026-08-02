@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 
 # JetBrains IDE
 .idea/
+
+# Local-only tooling, never committed
+.private/
