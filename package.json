@@ -25,5 +25,8 @@
         "tailwindcss": "^4.3.3",
         "typescript": "^7.0.2",
         "vite": "^8.2.2"
+    },
+    "dependencies": {
+        "markdown-it": "^15.0.0"
     }
 }
