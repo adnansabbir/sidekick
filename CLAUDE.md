@@ -19,8 +19,7 @@ they want to actually learn each part, so:
   the goal right now is understanding, not speed.
 - If the user pushes back, asks "why", or seems unsure, pause and
   explain rather than pushing forward with more code.
-- This applies across POC 1 → POC 2 → POC 3 unless the user says
-  otherwise.
+- This applies throughout the project unless the user says otherwise.
 
 ## Documentation map
 
@@ -28,8 +27,8 @@ This file only covers repo orientation (layout, commands, tech stack).
 Everything else lives in `docs/` — **read the relevant file before
 starting related work:**
 
-- `docs/PROJECT_PLAN.md` — architecture, command schema, privacy goals,
-  and the POC 1 → POC 2 → POC 3 roadmap. Read this first, every session.
+- `docs/PROJECT_PLAN.md` — architecture, current state, known gaps, and
+  the roadmap. Read this first, every session.
 - `docs/CONVENTIONS.md` — code patterns as they get established. Read
   this before writing code.
 - `docs/COMMIT_CONVENTIONS.md` — commit message format and workflow.
@@ -42,26 +41,35 @@ relearned or reinvented each session.
 ## Repo layout
 
 ```
-odoo-voice-assistant/
-├── CLAUDE.md   ← this file (repo orientation only, see "Documentation map" above)
-├── docs/        ← architecture, coding conventions, commit conventions
-└── package.json ← Vite, @crxjs/vite-plugin, TypeScript, @types/chrome (devDependencies)
+sidekick/
+├── CLAUDE.md          ← this file (repo orientation only, see "Documentation map" above)
+├── docs/               ← architecture, coding conventions, commit conventions
+├── manifest.config.ts  ← Chrome extension manifest (TS, via @crxjs/vite-plugin's defineManifest)
+├── vite.config.ts      ← build config (crx + Tailwind v4 plugins)
+├── tsconfig.json       ← strict TypeScript config
+├── src/
+│   ├── background.ts          ← service worker: assigns each tab its own side panel
+│   ├── sidepanel.html/.css/.ts ← the side panel UI (chat, mic, settings)
+│   ├── icons/                  ← extension icons
+│   └── *.d.ts                  ← ambient types for browser APIs not yet in
+│                                   TypeScript's lib (SpeechRecognition, LanguageModel)
+└── package.json        ← Vite, @crxjs/vite-plugin, TypeScript, Tailwind, markdown-it
 ```
-
-No `src/`, manifest, or build config exists yet — POC 1 scaffolding
-hasn't started. See `docs/PROJECT_PLAN.md`'s "Status" section.
 
 ## Commands
 
-No `npm` scripts are wired up yet (dependencies are installed but there's
-no `vite.config.ts` / manifest / dev-build pipeline yet). This section
-gets filled in once POC 1 scaffolding lands.
+- `npm run dev` — Vite dev server with HMR; load the generated `dist/`
+  folder as an unpacked extension via `chrome://extensions`
+- `npm run build` — production build into `dist/`
+- `npm run format` — Prettier
 
 ## Tech stack
 
-- Chrome extension, Manifest V3
-- TypeScript, Vite, `@crxjs/vite-plugin`
-- UI: Chrome Side Panel
-- Odoo JSON-RPC, session-cookie auth for POC 1 (see
-  `docs/PROJECT_PLAN.md`'s "Privacy and cost goals")
-- No backend, no database, no telemetry, no external infrastructure
+- Chrome extension, Manifest V3, per-tab Chrome Side Panel UI
+- TypeScript (strict), Vite, `@crxjs/vite-plugin`, Tailwind v4
+- Chrome's built-in on-device AI — Gemini Nano via the Prompt API
+  (`LanguageModel`)
+- Web Speech API (`SpeechRecognition`) for speech-to-text
+- `markdown-it` for rendering the model's Markdown responses
+- No backend, no database, no telemetry, no external AI API, no
+  external infrastructure
