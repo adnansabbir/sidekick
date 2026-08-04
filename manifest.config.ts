@@ -6,7 +6,8 @@ export default defineManifest({
     version: "0.1.0",
     description:
         "Your AI sidekick for any website — summarize, chat, and take action.",
-    permissions: ["sidePanel"],
+    permissions: ["sidePanel", "scripting"],
+    host_permissions: ["<all_urls>"],
     side_panel: {
         default_path: "src/sidepanel.html",
     },

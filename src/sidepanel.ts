@@ -1,7 +1,17 @@
 import MarkdownIt from "markdown-it";
+import { findCommandInText, listCommands, runCommand } from "./commands";
+import {
+    appliedAiEnabled,
+    appliedLanguage,
+    openSettingsPage,
+    setOnLanguageApplied,
+} from "./settings";
 
 const markdownRenderer = new MarkdownIt({ html: false });
 
+const commandSuggestions = document.querySelector<HTMLDivElement>(
+    "#command-suggestions",
+)!;
 const micButton = document.querySelector<HTMLButtonElement>("#mic-button")!;
 const micIcon = document.querySelector<SVGElement>("#mic-icon")!;
 const micStopIcon = document.querySelector<SVGElement>("#mic-stop-icon")!;
@@ -17,16 +27,6 @@ const menuButton = document.querySelector<HTMLButtonElement>("#menu-button")!;
 const menuDropdown = document.querySelector<HTMLDivElement>("#menu-dropdown")!;
 const settingsMenuItem = document.querySelector<HTMLButtonElement>(
     "#settings-menu-item",
-)!;
-const settingsPage = document.querySelector<HTMLDivElement>("#settings-page")!;
-const settingsBackButton = document.querySelector<HTMLButtonElement>(
-    "#settings-back-button",
-)!;
-const settingsSaveButton = document.querySelector<HTMLButtonElement>(
-    "#settings-save-button",
-)!;
-const settingsCancelButton = document.querySelector<HTMLButtonElement>(
-    "#settings-cancel-button",
 )!;
 
 function closeMenu(): void {
@@ -54,34 +54,7 @@ document.addEventListener("click", (event) => {
 
 settingsMenuItem.addEventListener("click", () => {
     closeMenu();
-    settingsPage.classList.remove("hidden");
-});
-
-const LANGUAGE_STORAGE_KEY = "voiceAssistant.language";
-const DEFAULT_LANGUAGE = "en-US";
-
-const languageSelect =
-    document.querySelector<HTMLSelectElement>("#language-select")!;
-
-let appliedLanguage =
-    localStorage.getItem(LANGUAGE_STORAGE_KEY) ?? DEFAULT_LANGUAGE;
-languageSelect.value = appliedLanguage;
-
-let onLanguageApplied: ((lang: string) => void) | null = null;
-
-function closeSettingsDiscardingChanges(): void {
-    languageSelect.value = appliedLanguage;
-    settingsPage.classList.add("hidden");
-}
-
-settingsBackButton.addEventListener("click", closeSettingsDiscardingChanges);
-settingsCancelButton.addEventListener("click", closeSettingsDiscardingChanges);
-
-settingsSaveButton.addEventListener("click", () => {
-    appliedLanguage = languageSelect.value;
-    localStorage.setItem(LANGUAGE_STORAGE_KEY, appliedLanguage);
-    onLanguageApplied?.(appliedLanguage);
-    settingsPage.classList.add("hidden");
+    openSettingsPage();
 });
 
 const ASSISTANT_PROSE_CLASSES =
@@ -180,7 +153,14 @@ document.addEventListener("click", (event) => {
 
 async function sendMessage(text: string): Promise<void> {
     addMessage(text, "user");
-    if (languageModelSession) {
+
+    const commandName = findCommandInText(text);
+    if (commandName) {
+        await runCommand(commandName);
+        return;
+    }
+
+    if (appliedAiEnabled && languageModelSession) {
         const response = await languageModelSession.prompt(text);
         addMessage(response, "assistant");
     }
@@ -193,12 +173,120 @@ function submitTextInput(): void {
     }
     textInput.value = "";
     dictationBuffer = "";
+    hideCommandSuggestions();
     void sendMessage(text);
 }
 
 sendButton.addEventListener("click", submitTextInput);
 
+let filteredCommands: { name: string; description: string }[] = [];
+let highlightedCommandIndex = -1;
+
+function hideCommandSuggestions(): void {
+    commandSuggestions.classList.add("hidden");
+    commandSuggestions.innerHTML = "";
+    filteredCommands = [];
+    highlightedCommandIndex = -1;
+}
+
+function selectCommandSuggestion(name: string): void {
+    textInput.value = `/${name} `;
+    hideCommandSuggestions();
+    textInput.focus();
+}
+
+function renderCommandSuggestions(): void {
+    commandSuggestions.innerHTML = "";
+    filteredCommands.forEach((command, index) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.role = "option";
+        item.className = `flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm cursor-pointer ${
+            index === highlightedCommandIndex
+                ? "bg-black/5 dark:bg-white/10"
+                : ""
+        }`;
+
+        const name = document.createElement("span");
+        name.className = "font-medium";
+        name.textContent = `/${command.name}`;
+
+        const description = document.createElement("span");
+        description.className =
+            "text-xs text-neutral-500 dark:text-neutral-400";
+        description.textContent = command.description;
+
+        item.append(name, description);
+
+        // mousedown (not click) fires before the input would blur, so
+        // preventing default here keeps focus on the input entirely.
+        item.addEventListener("mousedown", (event) => {
+            event.preventDefault();
+            selectCommandSuggestion(command.name);
+        });
+
+        commandSuggestions.appendChild(item);
+    });
+    commandSuggestions.classList.remove("hidden");
+}
+
+function updateCommandSuggestions(): void {
+    const match = /^\/(\S*)$/.exec(textInput.value);
+    if (!match) {
+        hideCommandSuggestions();
+        return;
+    }
+
+    const prefix = match[1].toLowerCase();
+    filteredCommands = listCommands().filter((command) =>
+        command.name.toLowerCase().startsWith(prefix),
+    );
+
+    if (filteredCommands.length === 0) {
+        hideCommandSuggestions();
+        return;
+    }
+
+    highlightedCommandIndex = 0;
+    renderCommandSuggestions();
+}
+
+textInput.addEventListener("input", updateCommandSuggestions);
+textInput.addEventListener("blur", hideCommandSuggestions);
+
 textInput.addEventListener("keydown", (event) => {
+    const suggestionsOpen = !commandSuggestions.classList.contains("hidden");
+
+    if (suggestionsOpen) {
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+            highlightedCommandIndex =
+                (highlightedCommandIndex + 1) % filteredCommands.length;
+            renderCommandSuggestions();
+            return;
+        }
+        if (event.key === "ArrowUp") {
+            event.preventDefault();
+            highlightedCommandIndex =
+                (highlightedCommandIndex - 1 + filteredCommands.length) %
+                filteredCommands.length;
+            renderCommandSuggestions();
+            return;
+        }
+        if (event.key === "Enter" || event.key === "Tab") {
+            event.preventDefault();
+            selectCommandSuggestion(
+                filteredCommands[highlightedCommandIndex].name,
+            );
+            return;
+        }
+        if (event.key === "Escape") {
+            event.preventDefault();
+            hideCommandSuggestions();
+            return;
+        }
+    }
+
     if (event.key === "Enter") {
         event.preventDefault();
         submitTextInput();
@@ -216,9 +304,9 @@ if (!SpeechRecognitionCtor) {
     recognition.interimResults = true;
     recognition.lang = appliedLanguage;
 
-    onLanguageApplied = (lang) => {
+    setOnLanguageApplied((lang) => {
         recognition.lang = lang;
-    };
+    });
 
     let userStoppedListening = true;
 

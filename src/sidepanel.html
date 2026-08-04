@@ -149,13 +149,21 @@
                         </button>
                     </div>
                 </div>
-                <input
-                    type="text"
-                    id="text-input"
-                    placeholder="Type or speak..."
-                    aria-label="Command input"
-                    class="flex-1 px-2.5 py-2 rounded-md border border-black/15 dark:border-white/15 bg-black/5 dark:bg-white/5 text-inherit font-inherit"
-                />
+                <div class="relative flex-1">
+                    <div
+                        id="command-suggestions"
+                        role="listbox"
+                        class="hidden absolute bottom-full left-0 mb-2 w-full max-h-48 overflow-y-auto rounded-md border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-lg py-1 z-10"
+                    ></div>
+                    <input
+                        type="text"
+                        id="text-input"
+                        placeholder="Type or speak..."
+                        aria-label="Command input"
+                        autocomplete="off"
+                        class="w-full px-2.5 py-2 rounded-md border border-black/15 dark:border-white/15 bg-black/5 dark:bg-white/5 text-inherit font-inherit"
+                    />
+                </div>
                 <button
                     type="button"
                     id="send-button"
@@ -223,6 +231,28 @@
                     <option value="ur-PK">Urdu</option>
                     <option value="de-DE">German</option>
                 </select>
+
+                <div class="mt-4 flex items-center justify-between">
+                    <label for="ai-enabled-toggle" class="text-sm font-medium">
+                        Enable AI responses
+                    </label>
+                    <label
+                        for="ai-enabled-toggle"
+                        class="relative inline-flex cursor-pointer items-center"
+                    >
+                        <input
+                            type="checkbox"
+                            id="ai-enabled-toggle"
+                            class="peer sr-only"
+                        />
+                        <div
+                            class="h-6 w-11 rounded-full bg-black/15 transition-colors peer-checked:bg-blue-600 dark:bg-white/15"
+                        ></div>
+                        <div
+                            class="absolute left-0.5 h-5 w-5 rounded-full bg-white transition-transform peer-checked:translate-x-5"
+                        ></div>
+                    </label>
+                </div>
             </div>
             <div
                 class="flex items-center justify-end gap-2 shrink-0 p-3 border-t border-black/10 dark:border-white/10"

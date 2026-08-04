@@ -49,10 +49,12 @@ sidekick/
 ├── tsconfig.json       ← strict TypeScript config
 ├── src/
 │   ├── background.ts          ← service worker: assigns each tab its own side panel
-│   ├── sidepanel.html/.css/.ts ← the side panel UI (chat, mic, settings)
-│   ├── icons/                  ← extension icons
-│   └── *.d.ts                  ← ambient types for browser APIs not yet in
-│                                   TypeScript's lib (SpeechRecognition, LanguageModel)
+│   ├── sidepanel.html/.css/.ts ← the side panel UI (chat, mic, command suggestions)
+│   ├── settings.ts             ← settings page state + Save/Cancel logic
+│   ├── commands/                ← slash-command registry ("/read", etc.) — one file per command
+│   ├── icons/                   ← extension icons
+│   └── types/                   ← ambient .d.ts files for browser APIs not yet in
+│                                    TypeScript's lib (SpeechRecognition, LanguageModel)
 └── package.json        ← Vite, @crxjs/vite-plugin, TypeScript, Tailwind, markdown-it
 ```
 
@@ -71,5 +73,8 @@ sidekick/
   (`LanguageModel`)
 - Web Speech API (`SpeechRecognition`) for speech-to-text
 - `markdown-it` for rendering the model's Markdown responses
+- `chrome.scripting` + `host_permissions: ["<all_urls>"]` for reading
+  the active tab's content, driving a slash-command pipeline
+  (`src/commands/`)
 - No backend, no database, no telemetry, no external AI API, no
   external infrastructure

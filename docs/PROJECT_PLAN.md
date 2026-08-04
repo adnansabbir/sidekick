@@ -40,9 +40,21 @@ doesn't exist.
   and only stop on an explicit click.
 - **Markdown rendering** of Nano's replies via `markdown-it` (raw HTML
   disabled), since Nano naturally outputs Markdown formatting.
-- **Settings page** with a language selector, persisted to
-  `localStorage` with explicit Save/Cancel (draft) semantics. Currently
-  this only controls the speech-recognition language — see "Known gaps."
+- **Settings page** with a language selector and an "Enable AI
+  responses" toggle, both persisted to `localStorage` with explicit
+  Save/Cancel (draft) semantics. The language selector currently only
+  controls the speech-recognition language — see "Known gaps." When AI
+  is toggled off, messages still show in the chat but are never sent to
+  Nano.
+- **Slash commands.** Any message (typed or spoken) is scanned for a
+  `/word` token that matches a registered command name anywhere in the
+  text — not just at the start, and unmatched slashes (URLs, paths) are
+  ignored rather than flagged as errors. A matching command runs instead
+  of going to Nano. Typing `/` shows a filterable suggestion dropdown
+  navigable with ↑/↓, Enter/Tab to select, Escape to close. Commands
+  live in `src/commands/` — one file per command, self-registering via
+  import in `src/commands/index.ts`. First command: `/read`, which logs
+  the current tab's title, URL, and meta description to the console.
 
 ## Known gaps
 
@@ -74,10 +86,44 @@ doesn't exist.
   to set persistent behavior (e.g. "keep responses short") without
   repeating instructions on every message.
 
-## Planned: page-analysis / action pipeline (not built yet)
+## What we've learned about reading tabs
 
-The next major piece — letting the assistant read and act on the page
-you're actually on, not just have a freeform chat:
+- The manifest needs explicit permissions before any tab data is
+  visible: tab metadata (`url`, `title`, `favIconUrl`) requires the
+  `"tabs"` permission or host permissions; reading page content needs
+  `"scripting"` plus host access.
+- **`activeTab` didn't work reliably with our side-panel architecture.**
+  It grants host access only when the user "invokes the extension"
+  (action click, context menu, keyboard command, or omnibox) — Chrome's
+  own docs don't clarify whether opening a side panel counts, and in
+  practice calling `chrome.scripting.executeScript` from inside an
+  already-open panel threw `"Cannot access contents of the page"`. Fixed
+  by switching to `"host_permissions": ["<all_urls>"]` (persistent
+  access, not gesture-dependent) — the tradeoff is a stronger Chrome
+  install warning, which is an acceptable cost for an assistant whose
+  whole purpose is reading whatever site you're on.
+- `chrome.tabs.captureVisibleTab()` (a screenshot, not just DOM text)
+  only works on the tab that's currently visible/focused — it cannot
+  capture a background tab, unlike `executeScript`, which works
+  regardless of focus.
+- `chrome://` pages, the Chrome Web Store, and other extensions' pages
+  stay off-limits to script injection no matter what permissions are
+  granted.
+- First real test: the `/read` command uses
+  `chrome.tabs.query({active: true, currentWindow: true})` +
+  `chrome.scripting.executeScript` to pull `document.title`,
+  `location.href`, and the meta description — confirmed working end to
+  end. Caveat: side panels have no built-in "which tab am I" API, so
+  `/read` resolves its target via "whichever tab is currently active in
+  this window," which usually but isn't strictly guaranteed to match the
+  exact tab this panel instance was opened for.
+
+## Planned: page-analysis / action pipeline
+
+The command-dispatch mechanism now exists (`src/commands/`) and permissions
+are sorted out; `/read` is the first proof it works end to end. Still to
+build — letting the assistant read and act on the page more generally,
+not just have a freeform chat:
 
 - Collect lightweight page context (URL + metadata) and send it to Nano
   along with the user's prompt and a fixed list of available trusted
@@ -109,4 +155,6 @@ Chrome's built-in on-device AI and Web Speech APIs.
 ## Status
 
 Chat + speech-to-text + Gemini Nano is built and working, per-tab. The
-page-analysis/action pipeline described above is next.
+slash-command dispatcher exists with one working command (`/read`) that
+proves tab access is correctly configured. Building out more commands
+toward the full page-analysis/action pipeline is next.
