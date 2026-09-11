@@ -64,16 +64,71 @@ page"` from inside an already-open panel. `host_permissions` is
 
 ## Commands
 
-- Slash commands live in `src/commands/`: one file per command, each
-  calling `registerCommand(name, description, handler)` at module load
-  (a self-registering side effect), imported once from
-  `src/commands/index.ts` so adding a command is "new file + one import
-  line," nothing else changes.
-- Command matching scans the whole message for a `/word` token that
-  matches something registered — not just a prefix at the start of the
-  string. A `/` that doesn't match anything (a URL, a path) is ignored,
-  not flagged as an error, so normal chat text isn't disrupted by
-  incidental slashes.
+- Commands live in `src/commands/`: one file per command, each calling
+  `registerCommand(name, handler, commandAlias?)` at module load (a
+  self-registering side effect), imported once from
+  `src/commands/index.ts`.
+- `commandAlias` is optional and is the only thing that exposes a command
+  as `/alias` in chat and the suggestion dropdown — a command with no
+  alias exists purely for the agent (Gemini) to invoke, never for a human
+  to type.
+- Each command's name, description, and params are defined once in
+  `src/commands/toolManifest.json`, keyed by the exact same `name` string
+  passed to `registerCommand`. This is the single source of truth for
+  what gets shown to Gemini (via `formatAgentTools()`); `registerCommand`
+  itself only owns execution (name → handler). `assertManifestConsistency()`
+  (called once from `index.ts` after all commands register) logs a
+  console error if the two ever drift apart — a soft safety net, not a
+  build-breaking check, since the manifest is deliberately a plain JSON
+  file for now so it can later be swapped for an auto-generated one
+  without touching the registry or handlers.
+- Shared tab access lives in `src/commands/tab.ts`: `getActiveTab()` and
+  `execInActiveTab(func, args)` (a single `chrome.scripting.executeScript`
+  wrapper every read command uses). `execInActiveTab` swallows a failed
+  injection (`chrome://` pages, the Web Store, some PDFs) and returns
+  `null` rather than throwing, since restricted pages are an expected
+  case, not an exceptional one.
+- Command matching for slash commands scans the whole message for a
+  `/word` token that matches a registered alias — not just a prefix at
+  the start of the string. A `/` that doesn't match anything (a URL, a
+  path) is ignored, not flagged as an error, so normal chat text isn't
+  disrupted by incidental slashes.
+
+## Agent loop (Gemini invoking commands)
+
+See `docs/PROJECT_PLAN.md`'s "What we've learned about the agent loop"
+for the empirical reasoning behind these patterns — this section states
+only the resulting rule.
+
+- `src/sidepanel.ts`'s `runAgentLoop()` is the actual agent. Each message
+  sends Gemini the live tool list (`formatAgentTools()`), a size hint for
+  `command.read.body`'s `full` format (cached per tab via
+  `peekBodySizes()`, only recomputed when the active tab's URL changes),
+  the ambient `command.read.meta_data` result (always included, never
+  gated behind an explicit request), and the guardrail text — constrained
+  via `responseConstraint: AGENT_RESPONSE_SCHEMA` to `{type: "answer",
+answer} | {type: "execute", commands: [{name, params}]}`.
+- `commands` entries are `{name, params}` objects, not `[name, params]`
+  tuples.
+- Model output is untrusted: every `execute` entry is defensively
+  reparsed in `runAgentLoop` (reject non-objects, a missing/non-string
+  `name`, non-object `params`) rather than trusted to match the schema.
+- `GUARDRAILS` is one shared constant used both in the persistent system
+  prompt and re-appended to every round's prompt (together with a
+  tab-changed note, when relevant) as a reminder.
+- `formatAgentTools()` renders each param'd command with both its raw
+  schema and a concrete `Example call` (derived from each param's
+  `default`, or its first `options` key).
+- Every `.prompt()` call has a 60s timeout via `AbortController`
+  (`PROMPT_TIMEOUT_MS`). On timeout, the session is recreated from
+  `conversationHistory` (a plain `{role, content}[]` array, tracked
+  outside the session, uncapped) so the conversation's topic survives
+  even though that one round's scaffolding is lost. `QuotaExceededError`
+  is caught separately and does _not_ recreate the session.
+- `isAgentBusy` blocks a second message from starting while one is still
+  awaiting a response, and disables the send button for the duration
+  (the same disabling pattern already used for mic-vs-send state) rather
+  than accepting and silently discarding the input.
 
 ## Formatting
 

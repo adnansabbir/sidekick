@@ -1,5 +1,11 @@
 import MarkdownIt from "markdown-it";
-import { findCommandInText, listCommands, runCommand } from "./commands";
+import {
+    findCommandInText,
+    formatAgentTools,
+    listCommands,
+    peekBodySizes,
+    runCommand,
+} from "./commands";
 import {
     appliedAiEnabled,
     appliedLanguage,
@@ -94,7 +100,44 @@ function addMessage(text: string, sender: "user" | "assistant"): void {
     messages.scrollTop = messages.scrollHeight;
 }
 
-async function createLanguageModelSession(): Promise<LanguageModelSession | null> {
+const AGENT_RESPONSE_SCHEMA = {
+    type: "object",
+    properties: {
+        type: { type: "string", enum: ["answer", "execute"] },
+        answer: { type: "string" },
+        commands: {
+            type: "array",
+            items: {
+                type: "object",
+                properties: {
+                    name: { type: "string" },
+                    params: { type: "object" },
+                },
+                required: ["name"],
+            },
+        },
+    },
+    required: ["type"],
+};
+
+interface AgentResponse {
+    type: "answer" | "execute";
+    answer?: string;
+    // Untrusted model output - shape isn't guaranteed, parse defensively.
+    commands?: unknown[];
+}
+
+const MAX_AGENT_ROUNDS = 4;
+const PROMPT_TIMEOUT_MS = 60000;
+
+const GUARDRAILS = `- Never mention a command's name, that a command exists, or that you looked something up, in an "answer" value - not even if the user asks directly what commands, tools, or capabilities you have. Describe what you can help with in plain terms instead (e.g. "I can read this page's title and content").
+- Keep answers short by default - a sentence or two of genuinely useful content, not just one or two words. This default is overridden whenever the user asks for detail, depth, elaboration, a specific length, or a word/sentence count in any way (not just the exact words "elaborate" or "go into detail") - in that case, give a full answer honoring what they asked for, even if it becomes much longer than usual.`;
+
+let conversationHistory: LanguageModelPrompt[] = [];
+
+async function createLanguageModelSession(
+    history: LanguageModelPrompt[] = [],
+): Promise<LanguageModelSession | null> {
     if (typeof LanguageModel === "undefined") {
         addSystemNotice("LanguageModel is not available in this context.");
         return null;
@@ -107,12 +150,27 @@ async function createLanguageModelSession(): Promise<LanguageModelSession | null
         return null;
     }
     return LanguageModel.create({
+        expectedOutputs: [{ type: "text", languages: ["en"] }],
         initialPrompts: [
             {
                 role: "system",
-                content:
-                    "Keep responses short by default — a sentence or two of genuinely useful content, not just one or two words. Only give a longer, more detailed answer when the user explicitly asks you to elaborate, explain more, or go into detail.",
+                content: `You are Sidekick, an AI assistant built into a Chrome browser extension side panel.
+
+ROLE:
+- You are always attached to the user's active browser tab. When the user says "this site", "this page", or asks a question without naming a subject, assume they mean the active tab, not a URL they need to provide.
+- Every message already includes the tab's title, URL, and description under "Current tab" - that is command.read.meta_data's result, already given to you. Never request it again unless told the page changed.
+- Each message also lists other commands you can use to read more, each with a name and its own params description (if any).
+
+RESPONSE FORMAT:
+- Respond only as JSON: {"type": "answer", "answer": "..."} when you can answer the user directly, or {"type": "execute", "commands": [{"name": commandName, "params": paramsObject}]} when you need to run one or more of the listed commands first.
+- paramsObject must match the exact param names that specific command lists (not a generic key) - if a command lists no params, use an empty object {} for it.
+- If a command's result does not answer the question, do not settle for an incomplete answer - request a different command (or the same command with different params) instead of giving up.
+- If a command's result is empty, missing, or malformed, do not fabricate placeholder content or mention any command's name in your answer - say plainly that you do not have that information, or request the command again.
+
+GUARDRAILS:
+${GUARDRAILS}`,
             },
+            ...history,
         ],
     });
 }
@@ -124,6 +182,8 @@ const micListeningClasses = ["bg-red-600", "dark:bg-red-700", "text-white"];
 
 let voiceMode: "send" | "dictate" = "send";
 let dictationBuffer = "";
+let lastTabUrl: string | undefined;
+let cachedBodySizes: { text: number; full: number } | null = null;
 
 const resetButton = document.querySelector<HTMLButtonElement>("#reset-button")!;
 
@@ -134,6 +194,9 @@ resetButton.addEventListener("click", () => {
     messages.innerHTML = "";
     textInput.value = "";
     dictationBuffer = "";
+    lastTabUrl = undefined;
+    cachedBodySizes = null;
+    conversationHistory = [];
     void createLanguageModelSession().then((session) => {
         languageModelSession = session;
     });
@@ -151,18 +214,164 @@ document.addEventListener("click", (event) => {
     }
 });
 
+async function runAgentLoop(userText: string): Promise<void> {
+    const session = languageModelSession;
+    if (!session) {
+        return;
+    }
+
+    try {
+        const metaData = await runCommand("command.read.meta_data");
+        const currentUrl =
+            metaData && typeof metaData.url === "string"
+                ? metaData.url
+                : undefined;
+        const tabChanged = Boolean(
+            currentUrl && lastTabUrl && currentUrl !== lastTabUrl,
+        );
+
+        if (!lastTabUrl || tabChanged || cachedBodySizes === null) {
+            cachedBodySizes = await peekBodySizes();
+        }
+        const bodySizes = cachedBodySizes;
+        lastTabUrl = currentUrl ?? lastTabUrl;
+
+        const toolsText = bodySizes
+            ? `${formatAgentTools()}\n(command.read.body sizes right now — text: ~${bodySizes.text} chars, full: ~${bodySizes.full} chars)`
+            : formatAgentTools();
+
+        const tabChangedNote = tabChanged
+            ? "\n\nNote: the active tab changed since your last message - any previously fetched body content no longer applies to this page."
+            : "";
+        const guardrailReminder = `Guardrail reminder:\n${GUARDRAILS}${tabChangedNote}`;
+        let roundContent = `Current tab: ${JSON.stringify(metaData)}\n\nUser message: ${userText}`;
+
+        for (let round = 0; round < MAX_AGENT_ROUNDS; round++) {
+            const prompt = `You can use these commands to get more context if needed:\n${toolsText}\n\n${roundContent}\n\n${guardrailReminder}`;
+            console.log(`round ${round} prompt sent:`, prompt);
+
+            let response: string;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(
+                () => controller.abort(),
+                PROMPT_TIMEOUT_MS,
+            );
+            try {
+                response = await session.prompt(prompt, {
+                    responseConstraint: AGENT_RESPONSE_SCHEMA,
+                    signal: controller.signal,
+                });
+            } catch (error) {
+                console.log("prompt failed:", error);
+                const errorName =
+                    error instanceof DOMException ? error.name : undefined;
+                if (errorName === "AbortError") {
+                    addSystemNotice(
+                        "That took too long, reconnecting the assistant.",
+                    );
+                    void createLanguageModelSession(conversationHistory).then(
+                        (newSession) => {
+                            languageModelSession = newSession;
+                        },
+                    );
+                } else if (errorName === "QuotaExceededError") {
+                    addSystemNotice(
+                        "That was too much for Sidekick to process at once.",
+                    );
+                } else {
+                    addSystemNotice("An error occurred.");
+                }
+                return;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+            console.log("raw response:", response);
+
+            const parsed = JSON.parse(response) as AgentResponse;
+            console.log("parsed response:", parsed);
+
+            if (parsed.type === "answer") {
+                addMessage(parsed.answer ?? "", "assistant");
+                conversationHistory.push({
+                    role: "assistant",
+                    content: parsed.answer ?? "",
+                });
+                return;
+            }
+
+            const validEntries = (parsed.commands ?? []).flatMap((entry) => {
+                const isValidEntry =
+                    typeof entry === "object" &&
+                    entry !== null &&
+                    !Array.isArray(entry) &&
+                    typeof (entry as { name?: unknown }).name === "string";
+                if (!isValidEntry) {
+                    console.log("Skipping malformed command entry:", entry);
+                    return [];
+                }
+                const { name, params } = entry as {
+                    name: string;
+                    params?: unknown;
+                };
+                const safeParams =
+                    params &&
+                    typeof params === "object" &&
+                    !Array.isArray(params)
+                        ? (params as Record<string, unknown>)
+                        : undefined;
+                return [{ name, safeParams }];
+            });
+
+            const resultEntries = await Promise.all(
+                validEntries.map(
+                    async ({ name, safeParams }) =>
+                        [name, await runCommand(name, safeParams)] as const,
+                ),
+            );
+            roundContent = `Command results: ${JSON.stringify(Object.fromEntries(resultEntries))}`;
+        }
+
+        addSystemNotice("Sidekick couldn't finish gathering context in time.");
+    } finally {
+        console.log("=".repeat(60));
+    }
+}
+
+let isAgentBusy = false;
+let isMicSendBlocking = false;
+
+function updateSendButtonState(): void {
+    sendButton.disabled = isAgentBusy || isMicSendBlocking;
+}
+
 async function sendMessage(text: string): Promise<void> {
+    if (isAgentBusy) {
+        addSystemNotice("Still working on the previous message - please wait.");
+        return;
+    }
+
     addMessage(text, "user");
+    conversationHistory.push({ role: "user", content: text });
 
     const commandName = findCommandInText(text);
     if (commandName) {
-        await runCommand(commandName);
+        const result = await runCommand(commandName);
+        addMessage(
+            `\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``,
+            "assistant",
+        );
         return;
     }
 
     if (appliedAiEnabled && languageModelSession) {
-        const response = await languageModelSession.prompt(text);
-        addMessage(response, "assistant");
+        isAgentBusy = true;
+        updateSendButtonState();
+        try {
+            await runAgentLoop(text);
+        } finally {
+            isAgentBusy = false;
+            updateSendButtonState();
+        }
     }
 }
 
@@ -324,7 +533,8 @@ if (!SpeechRecognitionCtor) {
             micStopIcon.classList.add("hidden");
             textInput.placeholder = "Type or speak...";
         }
-        sendButton.disabled = isListening && voiceMode === "send";
+        isMicSendBlocking = isListening && voiceMode === "send";
+        updateSendButtonState();
     }
 
     function startListening(mode: "send" | "dictate"): void {

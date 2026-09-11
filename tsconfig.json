@@ -8,6 +8,7 @@
         "strict": true,
         "skipLibCheck": true,
         "noEmit": true,
+        "resolveJsonModule": true,
         "allowImportingTsExtensions": true
     },
     "include": ["src", "manifest.config.ts", "vite.config.ts"]
