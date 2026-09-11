@@ -8,9 +8,6 @@ export default defineManifest({
         "Your AI sidekick for any website — summarize, chat, and take action.",
     permissions: ["sidePanel", "scripting"],
     host_permissions: ["<all_urls>"],
-    side_panel: {
-        default_path: "src/sidepanel.html",
-    },
     icons: {
         16: "src/icons/icon-16.png",
         32: "src/icons/icon-32.png",

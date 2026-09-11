@@ -4,12 +4,16 @@
         "lib": ["ES2022", "DOM", "DOM.Iterable"],
         "module": "ESNext",
         "moduleResolution": "Bundler",
-        "types": ["chrome"],
+        "types": ["chrome", "vite/client", "node"],
+        "jsx": "react-jsx",
         "strict": true,
         "skipLibCheck": true,
         "noEmit": true,
         "resolveJsonModule": true,
-        "allowImportingTsExtensions": true
+        "allowImportingTsExtensions": true,
+        "paths": {
+            "@/*": ["./src/*"]
+        }
     },
     "include": ["src", "manifest.config.ts", "vite.config.ts"]
 }
