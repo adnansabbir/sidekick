@@ -1,0 +1,50 @@
+{
+    "thread": {
+        "welcomeTitle": "How can I help you today?",
+        "loadingConversation": "Loading conversation",
+        "composerPlaceholder": "Send a message...",
+        "messageInputLabel": "Message input",
+        "scrollToBottom": "Scroll to bottom",
+        "voiceInput": "Voice input",
+        "startVoiceInput": "Start voice input",
+        "stopDictation": "Stop dictation",
+        "stopVoiceInput": "Stop voice input",
+        "sendMessage": "Send message",
+        "stopGenerating": "Stop generating",
+        "assistantWorking": "Assistant is working",
+        "exportMarkdown": "Export as Markdown",
+        "refresh": "Refresh",
+        "more": "More",
+        "previous": "Previous",
+        "next": "Next",
+        "edit": "Edit",
+        "cancel": "Cancel",
+        "update": "Update"
+    },
+    "attachment": {
+        "add": "Add Attachment",
+        "remove": "Remove file",
+        "typeImage": "Image",
+        "typeDocument": "Document",
+        "typeFile": "File",
+        "uploadFailed": "Upload failed",
+        "uploadingSuffix": ", uploading",
+        "uploadFailedSuffix": ", upload failed"
+    },
+    "image": {
+        "defaultAlt": "Image content",
+        "previewAlt": "Image preview",
+        "clickToZoom": "Click to zoom image",
+        "zoomedImage": "Zoomed image",
+        "closeZoomed": "Close zoomed image",
+        "generating": "Generating image…",
+        "generationFailed": "Image could not be generated",
+        "contentFilterBlocked": "The provider blocked this image.",
+        "download": "Download image",
+        "copy": "Copy image",
+        "regenerate": "Regenerate image"
+    },
+    "common": {
+        "copy": "Copy"
+    }
+}

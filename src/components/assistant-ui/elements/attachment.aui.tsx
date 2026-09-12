@@ -40,6 +40,8 @@ import {
 import { TooltipIconButton } from "@/components/assistant-ui/elements/tooltip-icon-button";
 import { useAttachmentSrc } from "@/hooks/use-attachment-src";
 import { cn } from "@/lib/utils";
+import { strings } from "@/i18n";
+import { Can } from "@/components/Can";
 
 type AttachmentPreviewProps = {
   src: string;
@@ -117,11 +119,11 @@ const AttachmentUI: FC = () => {
     const type = s.attachment.type;
     switch (type) {
       case "image":
-        return "Image";
+        return strings.attachment.typeImage;
       case "document":
-        return "Document";
+        return strings.attachment.typeDocument;
       case "file":
-        return "File";
+        return strings.attachment.typeFile;
       default:
         return type;
     }
@@ -141,7 +143,7 @@ const AttachmentUI: FC = () => {
   const errorMessage = useAuiState((s) =>
     s.attachment.status.type === "incomplete" &&
     s.attachment.status.reason === "error"
-      ? (s.attachment.status.message ?? "Upload failed")
+      ? (s.attachment.status.message ?? strings.attachment.uploadFailed)
       : undefined,
   );
 
@@ -180,7 +182,11 @@ const AttachmentUI: FC = () => {
                   if (e.key === " ") e.currentTarget.click();
                 }}
                 aria-label={`${typeLabel} attachment${
-                  isError ? ", upload failed" : isUploading ? ", uploading" : ""
+                  isError
+                    ? strings.attachment.uploadFailedSuffix
+                    : isUploading
+                      ? strings.attachment.uploadingSuffix
+                      : ""
                 }`}
               >
                 <AttachmentThumb />
@@ -220,7 +226,7 @@ const AttachmentRemove: FC = () => {
   return (
     <AttachmentPrimitive.Remove asChild>
       <TooltipIconButton
-        tooltip="Remove file"
+        tooltip={strings.attachment.remove}
         className="aui-attachment-tile-remove absolute end-1 top-1 size-5 rounded-full bg-black/50! text-white after:absolute after:-inset-1.5 hover:bg-black/70! hover:text-white! active:scale-[0.96] motion-reduce:transition-none"
         side="top"
       >
@@ -252,17 +258,19 @@ export const ComposerAttachments: FC = () => {
 
 export const ComposerAddAttachment: FC = () => {
   return (
-    <ComposerPrimitive.AddAttachment asChild>
-      <TooltipIconButton
-        tooltip="Add Attachment"
-        side="bottom"
-        variant="ghost"
-        size="icon"
-        className="aui-composer-add-attachment text-muted-foreground hover:text-foreground hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30 size-7 rounded-full active:scale-[0.96] motion-reduce:transition-none"
-        aria-label="Add Attachment"
-      >
-        <PlusIcon className="aui-attachment-add-icon size-4" />
-      </TooltipIconButton>
-    </ComposerPrimitive.AddAttachment>
+    <Can feature="chat.attachment" preserveLayout>
+      <ComposerPrimitive.AddAttachment asChild>
+        <TooltipIconButton
+          tooltip={strings.attachment.add}
+          side="bottom"
+          variant="ghost"
+          size="icon"
+          className="aui-composer-add-attachment text-muted-foreground hover:text-foreground hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30 size-7 rounded-full active:scale-[0.96] motion-reduce:transition-none"
+          aria-label={strings.attachment.add}
+        >
+          <PlusIcon className="aui-attachment-add-icon size-4" />
+        </TooltipIconButton>
+      </ComposerPrimitive.AddAttachment>
+    </Can>
   );
 };
