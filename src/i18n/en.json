@@ -46,5 +46,15 @@
     },
     "common": {
         "copy": "Copy"
+    },
+    "permission": {
+        "micTitle": "Microphone access",
+        "micDescription": "Sidekick needs permission to use your microphone for voice input. Chrome cannot show that prompt inside the side panel, so grant it here once — the side panel picks it up afterwards.",
+        "micGrant": "Allow microphone",
+        "micGranted": "Microphone access granted. You can close this tab and use the mic in the side panel.",
+        "micDenied": "Microphone access was not granted.",
+        "micNoticeBody": "Microphone access is needed for voice input. Chrome can't ask for it from the side panel, so grant it on the permissions page.",
+        "micNoticeAction": "Open permissions page",
+        "micNoticeDismiss": "Dismiss"
     }
 }

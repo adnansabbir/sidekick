@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="color-scheme" content="light dark" />
+        <title>Sidekick — Microphone access</title>
+    </head>
+    <body class="m-0 font-sans">
+        <main
+            class="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6"
+        >
+            <h1 id="title" class="text-lg font-semibold"></h1>
+            <p id="description" class="text-sm text-muted-foreground"></p>
+            <button
+                id="grant"
+                class="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            ></button>
+            <p id="status" class="text-sm" role="status" aria-live="polite"></p>
+        </main>
+        <script type="module" src="./permission.ts"></script>
+    </body>
+</html>

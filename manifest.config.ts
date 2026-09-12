@@ -25,4 +25,10 @@ export default defineManifest({
     background: {
         service_worker: "src/background.ts",
     },
+    // Separate UI to ask for permission
+    // Asking permission on the Sidepanel does not work on chrome
+    options_ui: {
+        page: "src/permission.html",
+        open_in_tab: true,
+    },
 });

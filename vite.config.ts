@@ -14,6 +14,9 @@ export default defineConfig({
                 sidepanel: fileURLToPath(
                     new URL("./src/sidepanel.html", import.meta.url),
                 ),
+                permission: fileURLToPath(
+                    new URL("./src/permission.html", import.meta.url),
+                ),
             },
         },
     },

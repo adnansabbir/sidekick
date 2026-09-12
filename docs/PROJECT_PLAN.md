@@ -51,8 +51,10 @@ implementation of all of it, and is the reference when porting.
 - **The chat model is still a placeholder.** `ChatPage`'s `echoAdapter`
   replies `"You said: …"`. This is the seam Gemini Nano plugs into.
 - **Speech-to-text** via assistant-ui's `WebSpeechDictationAdapter`,
-  attached as a sibling adapter on the runtime, which enables the
-  composer's built-in mic button. This replaced the hand-written
+  wrapped as `GuardedDictationAdapter` and attached as a sibling adapter
+  on the runtime, which enables the composer's built-in mic button. The
+  mic needs a one-time permission grant from the options page (see
+  "What we've learned about microphone access"). This replaced the hand-written
   `SpeechRecognition` code, and with it the two custom modes ("send as I
   speak" / "dictate only") and the keep-listening-through-silence
   behaviour — assistant-ui's default dictation behaviour is what we have
@@ -139,6 +141,10 @@ carry forward to the port — re-read them before rebuilding each piece.
   addresses one specific trigger, not hallucination in general — treated
   as an accepted small-model limitation for now, not something to keep
   chasing with more prompt wording.
+- **Speech-to-text is not on-device.** Chrome's `SpeechRecognition`
+  streams audio to Google's servers, which is a real exception to the
+  "no external API" principle above. True of the vanilla implementation
+  too; recorded here rather than fixed.
 - **Word/length instructions are honored loosely, not precisely.** Asked
   for "500-1000 words," Nano writes noticeably more than its short
   default but rarely anything close to the requested count. Not worth
@@ -219,6 +225,31 @@ params}]`, with `name`/`params` as real schema properties, resolved it.
   screen, which reads as broken. `conversationHistory` (tracked outside
   the session, independent of the tool-list/guardrail scaffolding sent
   each round) is what gets replayed into a freshly created session.
+
+## What we've learned about microphone access
+
+- **Chrome cannot show a permission prompt inside a side panel.** The
+  request is auto-dismissed — `getUserMedia` rejects with
+  `NotAllowedError: Permission dismissed` and `permissions.query` stays
+  at `"prompt"`, meaning the user was never actually asked. Confirmed
+  against a normal tab on the same machine, which prompts fine.
+- The fix is a separate extension page in a real tab
+  (`src/permission.html`, registered as `options_ui` with
+  **`open_in_tab: true`** — the default embeds it as a dialog inside
+  `chrome://extensions`, which can't prompt either). The grant is stored
+  per-origin, so the panel inherits it and the user does this once.
+- **`audioCapture` in the manifest does not help the Web Speech API**,
+  and neither does an offscreen document — offscreen documents are
+  invisible, so they have the same missing-prompt-surface problem the
+  side panel does. Both were tried and removed.
+- **assistant-ui has no permission handling at all** — no `getUserMedia`
+  or `permissions.query` anywhere in the package. It reports every
+  dictation failure through `console.error` alone, so a missing grant
+  looks like a mic button that does nothing.
+- `capabilities.dictation` is derived purely from whether a dictation
+  adapter was passed (`adapters?.dictation !== undefined`), never from
+  browser support — so withholding the adapter is how a feature gets
+  hidden.
 
 ## What we've learned about reading tabs
 

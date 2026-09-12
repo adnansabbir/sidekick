@@ -53,6 +53,7 @@ sidekick/
 │   ├── sidepanel.html           ← panel entry point; mounts #root
 │   ├── sidepanel.tsx            ← React root: theme detection + <ChatPage />
 │   ├── sidepanel.css            ← Tailwind v4 + shadcn theme tokens (the only CSS file)
+│   ├── permission.html/.ts      ← options page: grants the mic (a panel can't prompt)
 │   ├── pages/                   ← one file per top-level view (ChatPage: runtime + Thread)
 │   ├── components/
 │   │   ├── assistant-ui/elements/ ← chat UI vendored from the assistant-ui registry
@@ -60,7 +61,7 @@ sidekick/
 │   │   └── Can.tsx                ← role/feature gate wrapper
 │   ├── hooks/                   ← small shared React hooks
 │   ├── i18n/                    ← en.json + the `strings` seam (no hardcoded UI copy)
-│   ├── lib/                     ← roles.ts (role→feature map), utils.ts (`cn`)
+│   ├── lib/                     ← roles.ts, mic-permission.ts, dictation.ts, utils.ts
 │   └── icons/                   ← extension icons
 └── package.json        ← Vite, @crxjs/vite-plugin, React, TypeScript, Tailwind, assistant-ui
 ```

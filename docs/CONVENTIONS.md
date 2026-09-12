@@ -71,6 +71,13 @@ the code.
   re-apply those local edits rather than assuming a clean overwrite.
 - `src/components/` root is for app-specific components that are neither
   (e.g. `Can.tsx`).
+- Hide an unavailable feature by **withholding its adapter**, not by
+  wrapping the markup in a gate: `capabilities.dictation` is derived from
+  `adapters?.dictation !== undefined`, and the composer already hides the
+  mic button when it's false. Keep the three questions separate — `Can`
+  answers "may this user" (policy), adapter presence answers "can the
+  browser" (capability), and a permission check answers "has the user
+  granted it" (runtime state).
 - The chat model is a `ChatModelAdapter` passed to `useLocalRuntime` —
   that adapter is the single seam where the assistant's actual responses
   come from. Swapping in Gemini Nano means replacing the adapter, not
@@ -131,6 +138,11 @@ page"` from inside an already-open panel. `host_permissions` is
   persistent and gesture-independent, at the cost of a stronger install
   warning — an acceptable tradeoff for an assistant whose job is reading
   whatever site you're on.
+- A side panel can't raise a permission prompt (mic, camera, …) — the
+  request is auto-dismissed without asking. Ask from an extension page in
+  a real tab instead; the grant is per-origin, so the panel inherits it.
+  See `docs/PROJECT_PLAN.md`'s "What we've learned about microphone
+  access".
 - `chrome.scripting.executeScript` works on a tab regardless of whether
   it's currently focused. `chrome.tabs.captureVisibleTab()` does not —
   it only works on the tab that's actually visible right now.
