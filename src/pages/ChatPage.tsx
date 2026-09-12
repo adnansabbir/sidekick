@@ -1,6 +1,7 @@
 import {
     AssistantRuntimeProvider,
     useLocalRuntime,
+    WebSpeechDictationAdapter,
     type ChatModelAdapter,
 } from "@assistant-ui/react";
 import { Thread } from "@/components/assistant-ui/elements/thread.aui";
@@ -21,7 +22,9 @@ const echoAdapter: ChatModelAdapter = {
 };
 
 export function ChatPage() {
-    const runtime = useLocalRuntime(echoAdapter);
+    const runtime = useLocalRuntime(echoAdapter, {
+        adapters: { dictation: new WebSpeechDictationAdapter() },
+    });
     return (
         <AssistantRuntimeProvider runtime={runtime}>
             <Thread />
