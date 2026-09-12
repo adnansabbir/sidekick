@@ -45,18 +45,30 @@ sidekick/
 ├── CLAUDE.md          ← this file (repo orientation only, see "Documentation map" above)
 ├── docs/               ← architecture, coding conventions, commit conventions
 ├── manifest.config.ts  ← Chrome extension manifest (TS, via @crxjs/vite-plugin's defineManifest)
-├── vite.config.ts      ← build config (crx + Tailwind v4 plugins)
-├── tsconfig.json       ← strict TypeScript config
+├── vite.config.ts      ← build config (react + crx + Tailwind v4 plugins, `@` alias)
+├── components.json     ← shadcn config: style, path aliases, assistant-ui registry
+├── tsconfig.json       ← strict TypeScript config (`@/*` → `src/*`)
 ├── src/
-│   ├── background.ts          ← service worker: assigns each tab its own side panel
-│   ├── sidepanel.html/.css/.ts ← the side panel UI (chat, mic, command suggestions)
-│   ├── settings.ts             ← settings page state + Save/Cancel logic
-│   ├── commands/                ← slash-command registry ("/read", etc.) — one file per command
-│   ├── icons/                   ← extension icons
-│   └── types/                   ← ambient .d.ts files for browser APIs not yet in
-│                                    TypeScript's lib (SpeechRecognition, LanguageModel)
-└── package.json        ← Vite, @crxjs/vite-plugin, TypeScript, Tailwind, markdown-it
+│   ├── background.ts            ← service worker: opens a per-tab side panel on toolbar click
+│   ├── sidepanel.html           ← panel entry point; mounts #root
+│   ├── sidepanel.tsx            ← React root: theme detection + <ChatPage />
+│   ├── sidepanel.css            ← Tailwind v4 + shadcn theme tokens (the only CSS file)
+│   ├── pages/                   ← one file per top-level view (ChatPage: runtime + Thread)
+│   ├── components/
+│   │   ├── assistant-ui/elements/ ← chat UI vendored from the assistant-ui registry
+│   │   ├── ui/                    ← shadcn primitives (button, dialog, tooltip, …)
+│   │   └── Can.tsx                ← role/feature gate wrapper
+│   ├── hooks/                   ← small shared React hooks
+│   ├── i18n/                    ← en.json + the `strings` seam (no hardcoded UI copy)
+│   ├── lib/                     ← roles.ts (role→feature map), utils.ts (`cn`)
+│   └── icons/                   ← extension icons
+└── package.json        ← Vite, @crxjs/vite-plugin, React, TypeScript, Tailwind, assistant-ui
 ```
+
+Not present right now but coming back — see `docs/PROJECT_PLAN.md`'s
+"Not yet ported to React": `src/commands/` (the trusted command
+registry), the agent loop, the settings page, and `src/types/` (ambient
+declarations for `LanguageModel` / `SpeechRecognition`).
 
 ## Commands
 
@@ -68,13 +80,18 @@ sidekick/
 ## Tech stack
 
 - Chrome extension, Manifest V3, per-tab Chrome Side Panel UI
-- TypeScript (strict), Vite, `@crxjs/vite-plugin`, Tailwind v4
+- TypeScript (strict), Vite, `@crxjs/vite-plugin`
+- React 19 for the panel UI, with `@assistant-ui/react` providing the
+  chat runtime (`useLocalRuntime` + a `ChatModelAdapter`) and the
+  `Thread` component
+- Tailwind v4 + shadcn (`radix-ui` primitives, `lucide-react` icons,
+  `class-variance-authority`, `@fontsource-variable/geist`)
+- Markdown rendering via `@assistant-ui/react-markdown` + `remark-gfm`
 - Chrome's built-in on-device AI — Gemini Nano via the Prompt API
-  (`LanguageModel`)
-- Web Speech API (`SpeechRecognition`) for speech-to-text
-- `markdown-it` for rendering the model's Markdown responses
+  (`LanguageModel`) — **not currently wired into the React UI**
+- Speech-to-text via assistant-ui's `WebSpeechDictationAdapter`, which
+  wraps the Web Speech API's `SpeechRecognition`
 - `chrome.scripting` + `host_permissions: ["<all_urls>"]` for reading
-  the active tab's content, driving a slash-command pipeline
-  (`src/commands/`)
+  the active tab's content
 - No backend, no database, no telemetry, no external AI API, no
   external infrastructure

@@ -15,63 +15,103 @@ no server-side storage, no telemetry, no external AI API.
 Natural language is untrusted input. The model should never be given
 free rein to manipulate a page directly — it should only ever pick from
 a fixed, trusted set of action functions that our own code implements
-and executes. This is now enforced on the _read_ side (see "Agent loop"
-below — Gemini can only request one of a small set of registered
-commands, never arbitrary code or selectors); it still needs to be
-extended once page _actions_ (click, type) are built.
+and executes. This was enforced on the _read_ side on `main` (Gemini could
+only request one of a small set of registered commands, never arbitrary
+code or selectors). That code is not on the React branch yet — so the
+principle currently holds by default (nothing reaches the page at all)
+rather than by construction. Re-establishing it in the React
+`ChatModelAdapter` is a prerequisite for page _actions_ (click, type),
+not something to bolt on afterwards.
 
-## Current architecture (built and working)
+## Current architecture (branch: `sidekick-react`)
+
+The side panel UI has been rewritten in React. The **shell is built and
+running**; the assistant's actual intelligence — Nano, the command
+registry, the agent loop — has **not been ported into it yet** (see "Not
+yet ported to React"). `main` still holds the working vanilla-TS
+implementation of all of it, and is the reference when porting.
 
 - **Per-tab Chrome Side Panel.** Each tab gets its own independent panel
   instance — separate chat history, separate Nano session — not one
   panel shared across all tabs. The manifest's `side_panel.default_path`
-  alone only gives a single shared panel; per-tab isolation requires the
-  background service worker to call `chrome.sidePanel.setOptions()` for
-  every tab (see `src/background.ts`).
-- **Chat UI.** Message list, mic button (with a mode-picker popup), text
-  input, send button, and a header with a reset-conversation control and
-  a Settings entry (kebab menu).
-- **Gemini Nano** (the Prompt API's `LanguageModel`) powers responses,
-  with a session-level system prompt asking for concise-by-default
-  answers.
-- **Speech-to-text** via the Web Speech API's `SpeechRecognition`, with
-  two modes: "Send as I speak" (auto-sends each finalized phrase) and
-  "Dictate only" (accumulates into the input box, sent manually).
-  Listening is designed to persist across Chrome's own silence-timeouts
-  and only stop on an explicit click.
-- **Markdown rendering** of Nano's replies via `markdown-it` (raw HTML
-  disabled), since Nano naturally outputs Markdown formatting.
-- **Settings page** with a language selector and an "Enable AI
-  responses" toggle, both persisted to `localStorage` with explicit
-  Save/Cancel (draft) semantics. The language selector currently only
-  controls the speech-recognition language — see "Known gaps." When AI
-  is toggled off, messages still show in the chat but are never sent to
-  Nano.
-- **Slash commands.** Any message (typed or spoken) is scanned for a
-  `/word` token that matches a registered command's alias anywhere in
-  the text — not just at the start, and unmatched slashes (URLs, paths)
-  are ignored rather than flagged as errors. A matching command runs
-  instead of going to Nano, and its result now shows in the chat (as a
-  JSON code block) instead of only being logged. Typing `/` shows a
-  filterable suggestion dropdown navigable with ↑/↓, Enter/Tab to select,
-  Escape to close.
-- **Agent loop.** This is the real page-analysis pipeline the "Core
-  principle" above refers to. Every AI message goes through
-  `runAgentLoop()` (`src/sidepanel.ts`): Gemini gets the live tool list,
-  the current tab's metadata (always included, no request needed), and a
-  size hint for the page body — constrained via `responseConstraint` to
-  either answer the user directly or request one or more registered
-  commands by name. Requested commands run through the same trusted
-  registry slash commands use; results feed back into the next round
-  (capped at `MAX_AGENT_ROUNDS`). Two commands exist today:
-  `command.read.meta_data` (title/URL/description, always ambient) and
-  `command.read.body` (visible text or full HTML, model's choice). See
-  `docs/CONVENTIONS.md`'s "Agent loop" section for the implementation
-  details and the empirical reasons behind them (object-shaped commands
-  over tuples, example calls alongside the schema, per-round guardrail
-  repetition, the 60s timeout + session-recreation-from-history pattern).
+  alone only gives a single shared panel, so it was removed; the panel is
+  now registered lazily, per tab, when the toolbar icon is clicked
+  (`src/background.ts` calls `chrome.sidePanel.setOptions({tabId})` then
+  `.open({tabId})`). Neither call is awaited — `open()` requires the
+  click's user gesture, and awaiting anything first loses it.
+- **React app.** `src/sidepanel.html` mounts `#root`;
+  `src/sidepanel.tsx` creates the root, applies the theme, and renders
+  `ChatPage`. Vite's entry for the panel is declared in
+  `vite.config.ts`, not in the manifest.
+- **Chat UI via assistant-ui.** `ChatPage` creates a runtime with
+  `useLocalRuntime` and renders assistant-ui's `Thread` — message list,
+  composer, mic, attachments, branch navigation, markdown rendering and
+  the scroll/stop/copy affordances all come from the vendored registry
+  components in `src/components/assistant-ui/elements/`.
+- **The chat model is still a placeholder.** `ChatPage`'s `echoAdapter`
+  replies `"You said: …"`. This is the seam Gemini Nano plugs into.
+- **Speech-to-text** via assistant-ui's `WebSpeechDictationAdapter`,
+  attached as a sibling adapter on the runtime, which enables the
+  composer's built-in mic button. This replaced the hand-written
+  `SpeechRecognition` code, and with it the two custom modes ("send as I
+  speak" / "dictate only") and the keep-listening-through-silence
+  behaviour — assistant-ui's default dictation behaviour is what we have
+  now.
+- **Markdown rendering** via `@assistant-ui/react-markdown` +
+  `remark-gfm`, not `markdown-it` (still in `package.json`, now unused).
+- **i18n seam.** Every user-facing string — including `aria-label`s and
+  placeholders — lives in `src/i18n/en.json`, read through
+  `strings` from `src/i18n/index.ts`. Only English exists; the seam is
+  there so adding a locale touches one file.
+- **Role/feature gating.** `src/lib/roles.ts` maps a role to a set of
+  feature strings; `<Can feature="…">` renders children only if the
+  current role has it. The role comes from `localStorage` and defaults
+  to `anonymous`, so it fails closed. The composer's attachment button
+  is gated behind `chat.attachment` (dev-only) using `preserveLayout`,
+  which keeps an invisible placeholder so the send button doesn't shift.
+  This is UI-level gating, not a security boundary.
+- **Theme.** Dark mode is a `.dark` class on `<html>`, toggled in
+  `sidepanel.tsx` from `prefers-color-scheme` with a live listener, and
+  driven through shadcn theme tokens in `src/sidepanel.css`. Being
+  class-driven rather than media-query-driven is what leaves room for a
+  manual override later.
+
+## Not yet ported to React
+
+Deleted from `src/` in the rewrite, still present and working on `main`.
+Nothing here was abandoned on purpose — it is the port backlog, roughly
+in dependency order:
+
+1. **Ambient types** (`src/types/language-model.d.ts`,
+   `speech-recognition.d.ts`) — needed before any Nano code compiles.
+2. **Gemini Nano session** — availability check, `initialPrompts` system
+   prompt, `expectedOutputs`, the 60s `AbortController` timeout, and
+   session recreation from `conversationHistory`.
+3. **The command registry** (`src/commands/`: `registry.ts`, `tab.ts`,
+   `toolManifest.json`, `read/meta.ts`, `read/body.ts`) — the trusted
+   whitelist the "Core principle" depends on. The manifest's permissions
+   are unchanged (`sidePanel`, `scripting`, `<all_urls>`), so nothing
+   needs restoring there — `host_permissions` is what covers both tab
+   metadata and content injection.
+4. **The agent loop** — in React this belongs inside the
+   `ChatModelAdapter`, which is the natural home for it: the adapter
+   already owns "message in → response out", and the loop is just a
+   multi-round version of that. assistant-ui also renders tool calls
+   natively (`tool-group.aui.tsx`, `tool-fallback.aui.tsx`), so command
+   execution can be shown in the thread instead of dumped as a JSON code
+   block.
+5. **Slash commands and the suggestion dropdown** — alias matching plus
+   the `/`-triggered filterable list, which needs a custom composer
+   rather than the stock one.
+6. **The settings page** (`src/settings.ts`) — language selector and
+   "Enable AI responses" toggle with draft Save/Cancel semantics. There
+   is no settings UI at all right now, and no entry point to one.
 
 ## Known gaps
+
+These were found against the vanilla implementation on `main`. They are
+properties of Nano and of the design, not of the deleted code, so they
+carry forward to the port — re-read them before rebuilding each piece.
 
 - The language selector doesn't affect what language Nano _replies_
   in — only what language Chrome tries to transcribe speech as. Telling
@@ -214,9 +254,10 @@ params}]`, with `name`/`params` as real schema properties, resolved it.
 ## Planned: page actions
 
 The _read_ half of the page-analysis/action pipeline is built and working
-(see "Agent loop" above — `command.read.meta_data`, `command.read.body`,
-the execute/answer loop, guardrails). Still to build — letting the
-assistant _act_ on a page, not just read it:
+**on `main`** (see "Agent loop" above — `command.read.meta_data`,
+`command.read.body`, the execute/answer loop, guardrails), and needs
+porting to React first. Still to build — letting the assistant _act_ on
+a page, not just read it:
 
 - Add trusted action functions (e.g. `list_interactive_elements()`,
   `click_button()`, `type_in_input_box()`) as new registered commands,
@@ -249,11 +290,16 @@ Chrome's built-in on-device AI and Web Speech APIs.
 
 ## Status
 
-Chat + speech-to-text + Gemini Nano is built and working, per-tab. The
-full read-side agent loop is built and working: Gemini can request
-`command.read.meta_data` or `command.read.body` (text or full HTML) on
-its own, gets real page data back, and answers without leaking any
-internal mechanism — hardened against several real failure modes found
-through live testing (malformed tool calls, stuck sessions, stale
-cross-tab content, restricted-page crashes). Building page _actions_
-(click, type) on top of the same pattern is next.
+**On `main`:** chat + speech-to-text + Gemini Nano, per-tab, plus the
+full read-side agent loop — Gemini requests `command.read.meta_data` or
+`command.read.body` on its own, gets real page data back, and answers
+without leaking any internal mechanism. Hardened against several real
+failure modes found through live testing (malformed tool calls, stuck
+sessions, stale cross-tab content, restricted-page crashes).
+
+**On `sidekick-react` (current branch):** the React + assistant-ui shell
+is built and running — themed chat UI, working mic, i18n seam, role
+gating — but it answers with a placeholder echo adapter. Everything in
+"Not yet ported to React" is the work between here and parity with
+`main`; page _actions_ (click, type) come after that, on top of the
+restored command registry.
