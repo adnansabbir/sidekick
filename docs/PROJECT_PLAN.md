@@ -312,12 +312,86 @@ a page, not just read it:
   worth building before or alongside actions, since actions will likely
   need to reason about page content too.
 
+## Planned: multi-provider models
+
+Gemini Nano stays the default — always available, no configuration, no
+network request. Everything else is user-configured and strictly
+opt-in, added from the settings page (see below).
+
+- **Group providers by wire protocol, not by brand.** Most of what a
+  user would want to add — ChatGPT, a locally-run Codex exposed on
+  localhost, Ollama, and Gemini's own cloud API — all speak (or can
+  speak) the same OpenAI-shaped `/v1/chat/completions`-style request.
+  Confirmed directly: Gemini's cloud API has an OpenAI-compatible
+  endpoint at `https://generativelanguage.googleapis.com/v1beta/openai/`
+  (SSE streaming, swap in a Gemini key + model name, otherwise identical
+  to the OpenAI shape). So one generic "OpenAI-compatible HTTP" adapter,
+  configured per-provider with `{baseUrl, apiKey?, modelName}`, covers
+  all of those — a local Codex is just this adapter pointed at
+  `http://localhost:PORT` with no key. Claude's wire format genuinely
+  differs (system prompt as a separate field, different streaming
+  envelope) and needs its own adapter. That makes three adapters total
+  today (on-device, OpenAI-compatible HTTP, Anthropic HTTP), not one
+  per named provider.
+- **`ChatModelAdapter.run()` becomes a dispatcher**, not the model
+  logic itself: look up the currently selected provider+model, delegate
+  to the matching adapter above. Cross-provider behavior (the "you are
+  Sidekick" system prompt, guardrails, future tool-calling) lives in the
+  dispatcher so it isn't duplicated or allowed to drift per provider.
+- **Sequencing: build the pattern with one real provider before
+  generalizing.** First slice — the model picker starts with just Nano
+  plus a second, non-model "Add more" row (rendered alongside the
+  `models.map(...)` list, not as a fake `ModelOption`) that opens
+  settings. Pasting a Gemini API key there adds Gemini as a second real,
+  selectable option. This is deliberately the OpenAI-compatible adapter
+  being built for real, not a throwaway special case — ChatGPT/Ollama/
+  custom endpoints reuse it once a settings UI exists for them too.
+  Still undecided, to be settled once a second and third provider
+  actually exist: how a provider's model list is populated (hardcoded
+  per known provider, auto-fetched via the provider's own "list models"
+  endpoint, or manually typed), and whether v1 exposes exactly one
+  Gemini model or several.
+- **Model selection may end up as up to three selectors**, not
+  necessarily one dropdown: Model/Provider, an optional Variant (for a
+  provider with multiple models), and an optional Effort level (low/
+  medium/high — already a first-class concept in the vendored
+  `model-selector.tsx`'s `ModelOption.efforts`, not something to build
+  from scratch). Left open on purpose until real multi-model providers
+  exist to design against.
+- **Settings page scope grows accordingly.** The already-planned
+  settings page (see "Not yet ported to React" above) absorbs
+  `src/permission.html`'s mic-grant flow rather than staying a second
+  separate extension page, plus a new "AI providers" section: add/edit/
+  remove named provider configs, each with a transport kind (on-device /
+  OpenAI-compatible / Anthropic / custom) that determines which fields
+  show (API key vs. base URL). Provider configs (including API keys)
+  belong in `chrome.storage.local`, not `localStorage` — this is real
+  user-entered configuration, not a debug toggle. Worth being explicit
+  that no client-side extension storage is meaningfully "secure" against
+  someone with devtools access to their own browser, regardless of which
+  storage API is used.
+- **This does not reintroduce a backend.** Cloud providers are opt-in
+  and use the user's own credentials — the browser talks directly to
+  the provider; nothing routes through infrastructure Sidekick runs.
+  "No backend" stays true even once cloud providers are supported (see
+  "Privacy and cost goals" below, updated to reflect this).
+- **Speech-to-text privacy is a separate, related axis**, not coupled to
+  which chat model is selected. Already tracked in "Known gaps":
+  `SpeechRecognition` currently streams audio to Google regardless of
+  the chat model in use. A future local-vs-cloud STT toggle on the
+  settings page is planned but not scoped in detail yet.
+
 ## Privacy and cost goals
 
 No backend, no server-side storage, no telemetry, no user accounts, no
-analytics, no external AI API requirement (no OpenAI/Claude dependency),
-no recurring infrastructure cost. Everything runs in the browser using
-Chrome's built-in on-device AI and Web Speech APIs.
+analytics, no recurring infrastructure cost. On-device (Gemini Nano) and
+local-network (e.g. Ollama) processing are the default and require no
+configuration; connecting to a cloud provider (ChatGPT, Claude, Gemini's
+cloud API, or a custom endpoint) is strictly opt-in, configured by the
+user with their own credentials from the settings page. Even then,
+Sidekick never operates as a backend or proxy — the browser talks
+directly to whichever provider the user configured. Everything runs in
+the browser using Chrome's built-in on-device AI and Web Speech APIs.
 
 ## Status
 
