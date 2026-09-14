@@ -34,3 +34,26 @@ export const subscribeMicPermission = (
         listeners.delete(listener);
     };
 };
+
+// Whether a dictation attempt has happened without a grant — separate from
+// the permission state itself, since "denied"/"prompt" alone doesn't tell you
+// whether the user has actually tried the mic button yet.
+let noticeNeeded = false;
+const noticeListeners = new Set<(needed: boolean) => void>();
+
+const setNoticeNeeded = (next: boolean) => {
+    if (next === noticeNeeded) return;
+    noticeNeeded = next;
+    for (const listener of noticeListeners) listener(next);
+};
+
+export const requestMicNotice = () => setNoticeNeeded(true);
+export const dismissMicNotice = () => setNoticeNeeded(false);
+export const isMicNoticeNeeded = (): boolean => noticeNeeded;
+
+export const subscribeMicNotice = (listener: (needed: boolean) => void) => {
+    noticeListeners.add(listener);
+    return () => {
+        noticeListeners.delete(listener);
+    };
+};

@@ -1,7 +1,32 @@
+import { useEffect, useState } from "react";
 import { XIcon } from "lucide-react";
 import { strings } from "@/i18n";
+import {
+    dismissMicNotice,
+    getMicPermission,
+    isMicNoticeNeeded,
+    subscribeMicNotice,
+    subscribeMicPermission,
+} from "@/lib/mic-permission";
 
-export function MicPermissionNotice({ onDismiss }: { onDismiss: () => void }) {
+const shouldShow = () =>
+    isMicNoticeNeeded() && getMicPermission() !== "granted";
+
+export function MicPermissionNotice() {
+    const [visible, setVisible] = useState(shouldShow);
+
+    useEffect(() => {
+        const recompute = () => setVisible(shouldShow());
+        const unsubNotice = subscribeMicNotice(recompute);
+        const unsubPermission = subscribeMicPermission(recompute);
+        return () => {
+            unsubNotice();
+            unsubPermission();
+        };
+    }, []);
+
+    if (!visible) return null;
+
     return (
         <div
             role="alert"
@@ -20,7 +45,7 @@ export function MicPermissionNotice({ onDismiss }: { onDismiss: () => void }) {
             </p>
             <button
                 type="button"
-                onClick={onDismiss}
+                onClick={dismissMicNotice}
                 aria-label={strings.permission.micNoticeDismiss}
                 className="text-muted-foreground hover:text-foreground -mr-1 shrink-0 rounded p-1"
             >

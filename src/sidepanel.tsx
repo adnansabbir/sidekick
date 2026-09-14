@@ -1,19 +1,11 @@
-import { StrictMode, useEffect } from "react";
+ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ChatPage } from "@/pages/ChatPage";
+import { useSystemTheme } from "@/hooks/use-system-theme";
 import "./sidepanel.css";
 
 function App() {
-    useEffect(() => {
-        const media = window.matchMedia("(prefers-color-scheme: dark)");
-        const applyTheme = (source: MediaQueryList | MediaQueryListEvent) => {
-            document.documentElement.classList.toggle("dark", source.matches);
-        };
-        applyTheme(media);
-        media.addEventListener("change", applyTheme);
-        return () => media.removeEventListener("change", applyTheme);
-    }, []);
-
+    useSystemTheme();
     return <ChatPage />;
 }
 
