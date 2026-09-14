@@ -23,6 +23,10 @@ import {
   ToolGroupTrigger,
 } from "@/components/assistant-ui/elements/tool-group.aui";
 import { TooltipIconButton } from "@/components/assistant-ui/elements/tooltip-icon-button";
+import {
+  ModelSelector,
+  type ModelOption,
+} from "@/components/assistant-ui/elements/model-selector.aui";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -292,11 +296,19 @@ const Composer: FC<{ autoFocus: boolean }> = ({ autoFocus }) => {
   );
 };
 
+const MODELS: readonly ModelOption[] = [{ id: "gemini-nano", name: "Gemini Nano" }];
+
 const ComposerAction: FC = () => {
   return (
     <div className="aui-composer-action-wrapper relative flex items-center justify-between">
       <ComposerAddAttachment />
       <div className="flex items-center gap-1.5">
+        <ModelSelector
+          models={MODELS}
+          defaultValue="gemini-nano"
+          variant="ghost"
+          size="sm"
+        />
         <AuiIf condition={(s) => s.thread.capabilities.dictation}>
           <AuiIf condition={(s) => s.composer.dictation == null}>
             <ComposerPrimitive.Dictate asChild>
